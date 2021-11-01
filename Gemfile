@@ -43,6 +43,7 @@ gem 'aws-sdk-s3', require: false
 gem 'azure-storage-blob', require: false
 gem 'google-cloud-storage', require: false
 gem 'image_processing'
+gem "mini_magick"
 
 ##-- gems for database --#
 gem 'groupdate'
