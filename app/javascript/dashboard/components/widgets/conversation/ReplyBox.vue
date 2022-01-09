@@ -22,8 +22,8 @@
       />
       <reply-email-head
         v-if="showReplyHead"
-        :clear-mails="clearMails"
-        @set-emails="setCcEmails"
+        :cc-emails.sync="ccEmails"
+        :bcc-emails.sync="bccEmails"
       />
       <resizable-text-area
         v-if="!showRichContentEditor"
@@ -52,7 +52,7 @@
         @toggle-canned-menu="toggleCannedMenu"
       />
     </div>
-    <div v-if="hasAttachments" class="attachment-preview-box">
+    <div v-if="hasAttachments" class="attachment-preview-box" @paste="onPaste">
       <attachment-preview
         :attachments="attachedFiles"
         :remove-attachment="removeAttachment"
@@ -93,6 +93,7 @@ import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/cons
 import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor';
 import { checkFileSizeLimit } from 'shared/helpers/FileHelper';
 import { MAXIMUM_FILE_UPLOAD_SIZE } from 'shared/constants/messages';
+import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 import {
   isEscape,
@@ -141,7 +142,8 @@ export default {
       mentionSearchKey: '',
       hasUserMention: false,
       hasSlashCommand: false,
-      clearMails: false,
+      bccEmails: '',
+      ccEmails: '',
     };
   },
   computed: {
@@ -228,7 +230,7 @@ export default {
       return (
         this.isAWebWidgetInbox ||
         this.isAFacebookInbox ||
-        this.isATwilioWhatsappChannel ||
+        this.isAWhatsappChannel ||
         this.isAPIInbox ||
         this.isAnEmailChannel ||
         this.isATwilioSMSChannel ||
@@ -314,11 +316,22 @@ export default {
     // Donot use the keyboard listener mixin here as the events here are supposed to be
     // working even if input/textarea is focussed.
     document.addEventListener('keydown', this.handleKeyEvents);
+    document.addEventListener('paste', this.onPaste);
   },
   destroyed() {
     document.removeEventListener('keydown', this.handleKeyEvents);
+    document.removeEventListener('paste', this.onPaste);
   },
   methods: {
+    onPaste(e) {
+      const data = e.clipboardData.files;
+      if (!data.length || !data[0]) {
+        return;
+      }
+      const file = data[0];
+      const { name, type, size } = file;
+      this.onFileUpload({ name, type, size, file });
+    },
     toggleUserMention(currentMentionState) {
       this.hasUserMention = currentMentionState;
     },
@@ -356,8 +369,11 @@ export default {
         const messagePayload = this.getMessagePayload(newMessage);
         this.clearMessage();
         try {
-          await this.$store.dispatch('sendMessage', messagePayload);
-          this.$emit('scrollToMessage');
+          await this.$store.dispatch(
+            'createPendingMessageAndSend',
+            messagePayload
+          );
+          this.$emit(BUS_EVENTS.SCROLL_TO_MESSAGE);
         } catch (error) {
           const errorMessage =
             error?.response?.data?.error ||
@@ -365,7 +381,7 @@ export default {
           this.showAlert(errorMessage);
         }
         this.hideEmojiPicker();
-        this.clearMails = false;
+        this.$emit('update:popoutReplyBox', false);
       }
     },
     replaceText(message) {
@@ -388,7 +404,8 @@ export default {
     clearMessage() {
       this.message = '';
       this.attachedFiles = [];
-      this.clearMails = true;
+      this.ccEmails = '';
+      this.bccEmails = '';
     },
     toggleEmojiPicker() {
       this.showEmojiPicker = !this.showEmojiPicker;
@@ -415,9 +432,11 @@ export default {
     },
     toggleTyping(status) {
       const conversationId = this.currentChat.id;
+      const isPrivate = this.isPrivate;
       this.$store.dispatch('conversationTypingStatus/toggleTyping', {
         status,
         conversationId,
+        isPrivate,
       });
     },
     onFileUpload(file) {

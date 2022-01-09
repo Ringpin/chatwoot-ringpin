@@ -61,7 +61,7 @@ Rails.application.routes.draw do
             collection do
               get :meta
               get :search
-              get :filter
+              post :filter
             end
             scope module: :conversations do
               resources :messages, only: [:index, :create, :destroy]
@@ -83,11 +83,12 @@ Rails.application.routes.draw do
             collection do
               get :active
               get :search
-              get :filter
+              post :filter
               post :import
             end
             member do
               get :contactable_inboxes
+              post :destroy_custom_attributes
             end
             scope module: :contacts do
               resources :conversations, only: [:index]
@@ -165,11 +166,13 @@ Rails.application.routes.draw do
       end
 
       resource :profile, only: [:show, :update] do
+        delete :avatar, on: :collection
         member do
           post :availability
         end
       end
-      resource :notification_subscriptions, only: [:create]
+
+      resource :notification_subscriptions, only: [:create, :destroy]
 
       namespace :widget do
         resource :config, only: [:create]
@@ -183,7 +186,11 @@ Rails.application.routes.draw do
             post :transcript
           end
         end
-        resource :contact, only: [:show, :update]
+        resource :contact, only: [:show, :update] do
+          collection do
+            post :destroy_custom_attributes
+          end
+        end
         resources :inbox_members, only: [:index]
         resources :labels, only: [:create, :destroy]
       end
@@ -287,6 +294,8 @@ Rails.application.routes.draw do
     get 'super_admin/logout', to: 'super_admin/devise/sessions#destroy'
     namespace :super_admin do
       root to: 'dashboard#index'
+
+      resource :app_config, only: [:show, :create]
 
       # order of resources affect the order of sidebar navigation in super admin
       resources :accounts

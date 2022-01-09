@@ -122,6 +122,10 @@ gem 'hairtrigger'
 
 gem 'procore-sift'
 
+# parse email
+gem 'email_reply_trimmer'
+gem 'html2text'
+
 group :production, :staging do
   # we dont want request timing out in development while using byebug
   gem 'rack-timeout'
@@ -145,6 +149,8 @@ group :test do
   gem 'cypress-on-rails', '~> 1.0'
   # fast cleaning of database
   gem 'database_cleaner'
+  # mock http calls
+  gem 'webmock'
 end
 
 group :development, :test do
@@ -172,5 +178,4 @@ group :development, :test do
   gem 'simplecov', '0.17.1', require: false
   gem 'spring'
   gem 'spring-watcher-listen'
-  gem 'webmock'
 end
